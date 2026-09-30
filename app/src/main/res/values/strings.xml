@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">船務提醒</string>
+    <string name="default_rules"># 每行一條規則：關鍵字1|關鍵字2 => 推送內容\n# 可用變數：{loc}=地圖位置  {kw}=命中的字  {time}=時間\n# 以 # 開頭的行是註解\n停泊|停治 => ⚓ 船已到達【{loc}】港口，出現「停泊」提示（{time}）\n# 卡莫斯 => 🐙 卡莫斯出現了！位置：{loc}</string>
+</resources>

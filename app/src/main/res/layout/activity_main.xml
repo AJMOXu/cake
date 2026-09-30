@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#000000"
+    android:orientation="horizontal">
+
+    <LinearLayout
+        android:id="@+id/panel"
+        android:layout_width="210dp"
+        android:layout_height="match_parent"
+        android:background="#1E1E1E"
+        android:orientation="vertical"
+        android:padding="6dp">
+
+        <TextView
+            android:id="@+id/tvStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="#FFFFFF"
+            android:textSize="12sp" />
+
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1.2">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <Button android:id="@+id/btnStart" style="@style/PanelButton" android:text="▶ 開始監控" />
+                <Button android:id="@+id/btnOnce" style="@style/PanelButton" android:text="識別一次（測試）" />
+                <Button android:id="@+id/btnMapRoi" style="@style/PanelButton" android:text="框選地圖區（藍）" />
+                <Button android:id="@+id/btnKwRoi" style="@style/PanelButton" android:text="框選關鍵字區（橙）" />
+                <Button android:id="@+id/btnDebug" style="@style/PanelButton" android:text="查看上次識別畫面" />
+                <Button android:id="@+id/btnTest" style="@style/PanelButton" android:text="測試推送" />
+                <Button android:id="@+id/btnDim" style="@style/PanelButton" android:text="螢幕調暗（省電）" />
+                <Button android:id="@+id/btnSettings" style="@style/PanelButton" android:text="設定" />
+
+                <TextView
+                    android:id="@+id/tvZoom"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="變焦"
+                    android:textColor="#CCCCCC"
+                    android:textSize="12sp" />
+
+                <SeekBar
+                    android:id="@+id/seekZoom"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:max="100" />
+            </LinearLayout>
+        </ScrollView>
+
+        <ScrollView
+            android:id="@+id/logScroll"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:layout_marginTop="4dp"
+            android:background="#000000">
+
+            <TextView
+                android:id="@+id/tvLog"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:padding="3dp"
+                android:textColor="#9CCC65"
+                android:textSize="10sp" />
+        </ScrollView>
+    </LinearLayout>
+
+    <FrameLayout
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1">
+
+        <androidx.camera.view.PreviewView
+            android:id="@+id/previewView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+
+        <com.shipalert.RoiOverlayView
+            android:id="@+id/overlay"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+    </FrameLayout>
+</LinearLayout>

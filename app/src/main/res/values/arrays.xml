@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="res_entries">
+        <item>1280 x 720（最省電，適合老手機）</item>
+        <item>1920 x 1080（推薦）</item>
+        <item>2560 x 1440（文字小時使用）</item>
+    </string-array>
+    <string-array name="res_values">
+        <item>1280x720</item>
+        <item>1920x1080</item>
+        <item>2560x1440</item>
+    </string-array>
+</resources>

@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <PreferenceCategory android:title="PushPlus 推送" app:iconSpaceReserved="false">
+        <EditTextPreference
+            android:key="pp_token"
+            android:title="PushPlus Token"
+            android:dialogMessage="在 pushplus.plus 官網登入後，於「一對一推送」頁面複製 token"
+            app:iconSpaceReserved="false"
+            app:useSimpleSummaryProvider="true" />
+        <EditTextPreference
+            android:key="pp_topic"
+            android:title="群組編碼 topic（可選）"
+            android:dialogMessage="要推送給多人時填寫一對多群組編碼，否則留空"
+            app:iconSpaceReserved="false"
+            app:useSimpleSummaryProvider="true" />
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="識別" app:iconSpaceReserved="false">
+        <EditTextPreference
+            android:key="interval_sec"
+            android:defaultValue="10"
+            android:title="識別間隔（秒）"
+            app:iconSpaceReserved="false"
+            app:useSimpleSummaryProvider="true" />
+        <ListPreference
+            android:key="resolution"
+            android:defaultValue="1920x1080"
+            android:entries="@array/res_entries"
+            android:entryValues="@array/res_values"
+            android:title="攝像頭解析度"
+            app:iconSpaceReserved="false"
+            app:useSimpleSummaryProvider="true" />
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="關鍵字提醒" app:iconSpaceReserved="false">
+        <EditTextPreference
+            android:key="rules"
+            android:defaultValue="@string/default_rules"
+            android:title="關鍵字規則"
+            android:summary="點擊編輯。格式：停泊|停治 => 推送內容"
+            app:iconSpaceReserved="false" />
+        <EditTextPreference
+            android:key="confirm_frames"
+            android:defaultValue="2"
+            android:title="連續識別到幾次才推送（防誤報）"
+            app:iconSpaceReserved="false"
+            app:useSimpleSummaryProvider="true" />
+        <EditTextPreference
+            android:key="cooldown_min"
+            android:defaultValue="10"
+            android:title="同一關鍵字冷卻時間（分鐘）"
+            app:iconSpaceReserved="false"
+            app:useSimpleSummaryProvider="true" />
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="停留檢測（對比前後畫面）" app:iconSpaceReserved="false">
+        <SwitchPreferenceCompat
+            android:key="stay_enabled"
+            android:defaultValue="true"
+            android:title="啟用停留提醒"
+            app:iconSpaceReserved="false" />
+        <EditTextPreference
+            android:key="stay_min"
+            android:defaultValue="10"
+            android:title="停留超過多久提醒（分鐘）"
+            app:iconSpaceReserved="false"
+            app:useSimpleSummaryProvider="true" />
+        <EditTextPreference
+            android:key="stay_repeat_min"
+            android:defaultValue="30"
+            android:title="持續停留時每隔多久再提醒（分鐘，0=不重複）"
+            app:iconSpaceReserved="false"
+            app:useSimpleSummaryProvider="true" />
+        <EditTextPreference
+            android:key="diff_threshold"
+            android:defaultValue="8"
+            android:title="畫面差異閾值"
+            android:dialogMessage="主畫面會顯示即時「差異」數值。船靜止時的差異要小於此值、航行時要大於此值。一般 5~15。"
+            app:iconSpaceReserved="false"
+            app:useSimpleSummaryProvider="true" />
+        <SwitchPreferenceCompat
+            android:key="leave_notify"
+            android:defaultValue="true"
+            android:title="停留後恢復航行時提醒"
+            app:iconSpaceReserved="false" />
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="異常監測" app:iconSpaceReserved="false">
+        <EditTextPreference
+            android:key="notext_min"
+            android:defaultValue="5"
+            android:title="識別不到文字多久後報警（分鐘，0=關閉）"
+            app:iconSpaceReserved="false"
+            app:useSimpleSummaryProvider="true" />
+    </PreferenceCategory>
+</PreferenceScreen>
