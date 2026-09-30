@@ -18,6 +18,14 @@
     </PreferenceCategory>
 
     <PreferenceCategory android:title="識別" app:iconSpaceReserved="false">
+        <ListPreference
+            android:key="orientation"
+            android:defaultValue="landscape"
+            android:entries="@array/orient_entries"
+            android:entryValues="@array/orient_values"
+            android:title="拍攝方向"
+            app:iconSpaceReserved="false"
+            app:useSimpleSummaryProvider="true" />
         <EditTextPreference
             android:key="interval_sec"
             android:defaultValue="10"

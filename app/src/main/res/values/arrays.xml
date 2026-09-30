@@ -10,4 +10,16 @@
         <item>1920x1080</item>
         <item>2560x1440</item>
     </string-array>
+    <string-array name="orient_entries">
+        <item>橫屏（手機橫放，推薦）</item>
+        <item>豎屏（手機直立）</item>
+        <item>橫屏（反向，上下顛倒放置時用）</item>
+        <item>豎屏（反向）</item>
+    </string-array>
+    <string-array name="orient_values">
+        <item>landscape</item>
+        <item>portrait</item>
+        <item>reverse_landscape</item>
+        <item>reverse_portrait</item>
+    </string-array>
 </resources>

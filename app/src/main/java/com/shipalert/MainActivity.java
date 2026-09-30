@@ -2,6 +2,7 @@ package com.shipalert;
 
 import android.Manifest;
 import android.content.Intent;
+import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
@@ -14,11 +15,13 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.text.InputType;
 import android.util.Log;
 import android.util.Size;
 import android.view.MotionEvent;
 import android.view.WindowManager;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.ScrollView;
 import android.widget.SeekBar;
@@ -35,6 +38,7 @@ import androidx.camera.core.ImageAnalysis;
 import androidx.camera.core.ImageProxy;
 import androidx.camera.core.MeteringPoint;
 import androidx.camera.core.Preview;
+import androidx.camera.core.ResolutionInfo;
 import androidx.camera.core.resolutionselector.AspectRatioStrategy;
 import androidx.camera.core.resolutionselector.ResolutionSelector;
 import androidx.camera.core.resolutionselector.ResolutionStrategy;
@@ -52,6 +56,7 @@ import com.google.mlkit.vision.text.TextRecognizer;
 import com.google.mlkit.vision.text.chinese.ChineseTextRecognizerOptions;
 import com.shipalert.core.NormRect;
 import com.shipalert.core.OcrLine;
+import com.shipalert.core.ScreenParser;
 import com.shipalert.core.ShipMonitor;
 import com.shipalert.core.Signature;
 import com.shipalert.core.TimeFmt;
@@ -73,7 +78,7 @@ public class MainActivity extends AppCompatActivity implements ShipMonitor.Sink 
 
     private PreviewView previewView;
     private RoiOverlayView overlay;
-    private Button btnStart, btnDim;
+    private Button btnStart, btnDim, btnEdit;
     private TextView tvStatus, tvLog, tvZoom;
     private ScrollView logScroll;
     private SeekBar seekZoom;
@@ -91,6 +96,7 @@ public class MainActivity extends AppCompatActivity implements ShipMonitor.Sink 
     private volatile boolean monitoring;
     private volatile boolean busy;
     private volatile boolean oneShot;
+    private volatile boolean autoLocate;
     private volatile long lastProcessAt;
     private long monitorStartAt;
 
@@ -115,13 +121,15 @@ public class MainActivity extends AppCompatActivity implements ShipMonitor.Sink 
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-        setContentView(R.layout.activity_main);
         PreferenceManager.setDefaultValues(this, R.xml.prefs, false);
+        applyOrientation(AppConfig.load(this).orientation);
+        setContentView(R.layout.activity_main);
 
         previewView = findViewById(R.id.previewView);
         overlay = findViewById(R.id.overlay);
         btnStart = findViewById(R.id.btnStart);
         btnDim = findViewById(R.id.btnDim);
+        btnEdit = findViewById(R.id.btnEdit);
         tvStatus = findViewById(R.id.tvStatus);
         tvLog = findViewById(R.id.tvLog);
         tvZoom = findViewById(R.id.tvZoom);
@@ -135,29 +143,37 @@ public class MainActivity extends AppCompatActivity implements ShipMonitor.Sink 
         cfg = AppConfig.load(this);
         monitor = new ShipMonitor(this, cfg.monitor);
 
+        overlay.setImageAspect(cfg.isPortrait() ? 9f / 16f : 16f / 9f);
         overlay.setRois(cfg.mapRoi, cfg.kwRoi);
-        overlay.setListener((mode, r) -> {
-            AppConfig.saveRoi(this, mode == RoiOverlayView.MODE_MAP ? AppConfig.KEY_MAP_ROI : AppConfig.KEY_KW_ROI, r);
+        overlay.setListener((box, r) -> {
+            AppConfig.saveRoi(this, box == RoiOverlayView.BOX_MAP ? AppConfig.KEY_MAP_ROI : AppConfig.KEY_KW_ROI,
+                    cfg.isPortrait(), r);
             reloadConfig();
-            log((mode == RoiOverlayView.MODE_MAP ? "地圖區" : "關鍵字區") + "已更新：" + r);
         });
 
         btnStart.setOnClickListener(v -> toggleMonitoring());
-        findViewById(R.id.btnOnce).setOnClickListener(v -> {
-            oneShot = true;
-            log("正在識別一次…");
+        findViewById(R.id.btnToken).setOnClickListener(v -> showTokenDialog());
+        findViewById(R.id.btnTest).setOnClickListener(v -> {
+            if (cfg.token.isEmpty()) { showTokenDialog(); return; }
+            push("✅ 船務提醒測試", "這是一條測試推送，收到代表 PushPlus 設定正確。\n時間：" + now("yyyy-MM-dd HH:mm:ss"));
         });
-        findViewById(R.id.btnMapRoi).setOnClickListener(v -> overlay.startSelect(RoiOverlayView.MODE_MAP));
-        findViewById(R.id.btnKwRoi).setOnClickListener(v -> overlay.startSelect(RoiOverlayView.MODE_KW));
-        findViewById(R.id.btnKwRoi).setOnLongClickListener(v -> {
-            AppConfig.saveRoi(this, AppConfig.KEY_KW_ROI, NormRect.FULL);
+        findViewById(R.id.btnAuto).setOnClickListener(v -> {
+            autoLocate = true;
+            log("🔍 正在自動定位地圖…（請確保遊戲畫面右上角有地圖和「XX据点所属」字樣）");
+        });
+        btnEdit.setOnClickListener(v -> setEditing(!overlay.isEditing()));
+        btnEdit.setOnLongClickListener(v -> {
+            AppConfig.resetRois(this, cfg.isPortrait());
             reloadConfig();
-            log("關鍵字區已重設為全畫面");
+            log("已將" + (cfg.isPortrait() ? "豎屏" : "橫屏") + "框位重設為預設值");
             return true;
         });
+        findViewById(R.id.btnOnce).setOnClickListener(v -> {
+            oneShot = true;
+            log("正在識別一次（全畫面）…");
+        });
         findViewById(R.id.btnDebug).setOnClickListener(v -> showDebugDialog());
-        findViewById(R.id.btnTest).setOnClickListener(v -> push("✅ 船務提醒測試",
-                "這是一條測試推送，收到代表 PushPlus 設定正確。\n時間：" + now("yyyy-MM-dd HH:mm:ss")));
+        findViewById(R.id.btnOrient).setOnClickListener(v -> showOrientationDialog());
         btnDim.setOnClickListener(v -> toggleDim());
         findViewById(R.id.btnSettings).setOnClickListener(v -> startActivity(new Intent(this, SettingsActivity.class)));
 
@@ -183,11 +199,15 @@ public class MainActivity extends AppCompatActivity implements ShipMonitor.Sink 
         });
 
         log("App 啟動，Android " + Build.VERSION.RELEASE + "（API " + Build.VERSION.SDK_INT + "）");
-        if (cfg.token.isEmpty()) log("⚠ 尚未設定 PushPlus token，請到「設定」填寫");
+        log("拍攝方向：" + orientationLabel(cfg.orientation));
         updateStatus(null);
 
         if (!hasCameraPermission()) {
             ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.CAMERA}, REQ_CAMERA);
+        }
+        if (cfg.token.isEmpty()) {
+            log("⚠ 尚未設定 PushPlus token");
+            if (savedInstanceState == null) showTokenDialog();
         }
     }
 
@@ -201,6 +221,7 @@ public class MainActivity extends AppCompatActivity implements ShipMonitor.Sink 
     protected void onResume() {
         super.onResume();
         reloadConfig();
+        if (applyOrientation(cfg.orientation)) return;   // 方向變了，Activity 會重建
         if (hasCameraPermission() && (camera == null || !cfg.resolution.equals(boundResolution))) bindCamera();
     }
 
@@ -236,6 +257,94 @@ public class MainActivity extends AppCompatActivity implements ShipMonitor.Sink 
         cfg = AppConfig.load(this);
         monitor.setSettings(cfg.monitor);
         overlay.setRois(cfg.mapRoi, cfg.kwRoi);
+    }
+
+    // =========================== 方向 / Token / 框位 ===========================
+
+    private static int orientationConst(String o) {
+        if ("portrait".equals(o)) return ActivityInfo.SCREEN_ORIENTATION_PORTRAIT;
+        if ("reverse_landscape".equals(o)) return ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE;
+        if ("reverse_portrait".equals(o)) return ActivityInfo.SCREEN_ORIENTATION_REVERSE_PORTRAIT;
+        return ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE;
+    }
+
+    private String orientationLabel(String o) {
+        String[] v = getResources().getStringArray(R.array.orient_values);
+        String[] e = getResources().getStringArray(R.array.orient_entries);
+        for (int i = 0; i < v.length; i++) if (v[i].equals(o)) return e[i];
+        return o;
+    }
+
+    /** @return true 表示方向有改變（Activity 將重建） */
+    private boolean applyOrientation(String o) {
+        int want = orientationConst(o);
+        if (getRequestedOrientation() != want) {
+            setRequestedOrientation(want);
+            return true;
+        }
+        return false;
+    }
+
+    private void showOrientationDialog() {
+        if (monitoring) {
+            Toast.makeText(this, "請先停止監控再切換方向", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        final String[] values = getResources().getStringArray(R.array.orient_values);
+        int cur = 0;
+        for (int i = 0; i < values.length; i++) if (values[i].equals(cfg.orientation)) cur = i;
+        new AlertDialog.Builder(this)
+                .setTitle("拍攝方向（橫屏、豎屏各自保存一套框位）")
+                .setSingleChoiceItems(R.array.orient_entries, cur, (d, which) -> {
+                    d.dismiss();
+                    AppConfig.putString(this, AppConfig.KEY_ORIENTATION, values[which]);
+                    reloadConfig();
+                    applyOrientation(values[which]);
+                })
+                .setNegativeButton("取消", null)
+                .show();
+    }
+
+    private void showTokenDialog() {
+        final EditText et = new EditText(this);
+        et.setSingleLine(true);
+        et.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD);
+        et.setHint("貼上 32 位 token");
+        et.setText(cfg.token);
+        et.setSelection(et.getText().length());
+        int pad = Math.round(20 * getResources().getDisplayMetrics().density);
+        android.widget.FrameLayout box = new android.widget.FrameLayout(this);
+        box.setPadding(pad, pad / 2, pad, 0);
+        box.addView(et);
+        new AlertDialog.Builder(this)
+                .setTitle("設定 PushPlus Token")
+                .setMessage("1. 電腦或手機瀏覽器打開 www.pushplus.plus，用微信掃碼登入\n"
+                        + "2. 點上方「發送消息 → 一對一消息」\n"
+                        + "3. 複製頁面上的 token，貼到下面")
+                .setView(box)
+                .setPositiveButton("保存並測試", (d, w) -> {
+                    String t = et.getText().toString().replaceAll("\\s+", "");
+                    AppConfig.putString(this, AppConfig.KEY_TOKEN, t);
+                    reloadConfig();
+                    if (t.isEmpty()) {
+                        log("⚠ token 已清空");
+                    } else {
+                        log("token 已保存（" + t.length() + " 位），發送測試推送…");
+                        push("✅ 船務提醒測試", "token 設定成功！之後的提醒都會推送到這裡。\n時間：" + now("yyyy-MM-dd HH:mm:ss"));
+                    }
+                })
+                .setNegativeButton("稍後", null)
+                .show();
+    }
+
+    private void setEditing(boolean on) {
+        if (on && monitoring) {
+            Toast.makeText(this, "監控中也可調整，調整後立即生效", Toast.LENGTH_SHORT).show();
+        }
+        overlay.setEditing(on);
+        btnEdit.setText(on ? "✔ 完成調整" : "調整框位");
+        if (on) log("調整框位：點框選中、拖動移動、拖白色圓點縮放、框外拖動重畫。長按此按鈕可恢復預設");
+        else log("框位已保存｜地圖區 " + cfg.mapRoi + "｜關鍵字區 " + cfg.kwRoi);
     }
 
     // =========================== 攝像頭 ===========================
@@ -276,7 +385,16 @@ public class MainActivity extends AppCompatActivity implements ShipMonitor.Sink 
                 camera = provider.bindToLifecycle(this, CameraSelector.DEFAULT_BACK_CAMERA, preview, analysis);
                 camera.getCameraControl().setLinearZoom(seekZoom.getProgress() / 100f);
                 boundResolution = cfg.resolution;
-                log("攝像頭已啟動（目標解析度 " + cfg.resolution + "）");
+                String got = "";
+                ResolutionInfo ri = analysis.getResolutionInfo();
+                if (ri != null) {
+                    Size rs = ri.getResolution();
+                    boolean swap = ri.getRotationDegrees() % 180 != 0;
+                    float w = swap ? rs.getHeight() : rs.getWidth(), h = swap ? rs.getWidth() : rs.getHeight();
+                    overlay.setImageAspect(w / h);
+                    got = "，實際 " + (int) w + "x" + (int) h;
+                }
+                log("攝像頭已啟動（目標 " + cfg.resolution + got + "）");
             } catch (Exception e) {
                 log("❌ 攝像頭啟動失敗：" + e);
                 Log.e(TAG, "bindCamera", e);
@@ -288,14 +406,16 @@ public class MainActivity extends AppCompatActivity implements ShipMonitor.Sink 
     private void analyze(@NonNull ImageProxy image) {
         final long now = System.currentTimeMillis();
         boolean due = monitoring && now - lastProcessAt >= cfg.intervalMs;
-        if (busy || !(due || oneShot)) {
+        if (busy || !(due || oneShot || autoLocate)) {
             image.close();
             return;
         }
         busy = true;
         lastProcessAt = now;
         final boolean isOneShot = oneShot;
+        final boolean isAutoLocate = autoLocate;
         oneShot = false;
+        autoLocate = false;
 
         Bitmap frame;
         try {
@@ -320,34 +440,79 @@ public class MainActivity extends AppCompatActivity implements ShipMonitor.Sink 
         final Bitmap f = frame;
         final AppConfig c = cfg;
         final float[] sig = mapSignature(f, c.mapRoi);
+
+        // 只對「地圖區 ∪ 關鍵字區」做 OCR：更快、更省電，也不會被框外的聊天文字干擾
+        final Rect crop = (isOneShot || isAutoLocate) ? null : ocrCrop(f.getWidth(), f.getHeight(), c);
+        final Bitmap ocrBmp;
         try {
-            recognizer.process(InputImage.fromBitmap(f, 0))
-                    .addOnSuccessListener(analysisExecutor, text -> handleText(now, f, text, sig, c, isOneShot))
+            ocrBmp = crop == null ? f : Bitmap.createBitmap(f, crop.left, crop.top, crop.width(), crop.height());
+        } catch (Throwable t) {
+            log("❌ 裁切失敗：" + t);
+            f.recycle();
+            busy = false;
+            return;
+        }
+        try {
+            recognizer.process(InputImage.fromBitmap(ocrBmp, 0))
+                    .addOnSuccessListener(analysisExecutor, text -> handleText(now, f, crop, text, sig, c, isOneShot, isAutoLocate))
                     .addOnFailureListener(analysisExecutor, e -> log("❌ OCR 失敗：" + e.getMessage()))
                     .addOnCompleteListener(analysisExecutor, t -> {
+                        if (ocrBmp != f) ocrBmp.recycle();
                         f.recycle();
                         busy = false;
                     });
         } catch (Throwable t) {
             log("❌ OCR 異常：" + t);
+            if (ocrBmp != f) ocrBmp.recycle();
             f.recycle();
             busy = false;
         }
     }
 
-    private void handleText(long now, Bitmap frame, Text text, float[] sig, AppConfig c, boolean isOneShot) {
+    /** 兩個框的聯集（外擴 3%）；聯集已接近全畫面時回傳 null（=不裁切）。 */
+    private static Rect ocrCrop(int w, int h, AppConfig c) {
+        float pad = 0.03f;
+        float l = Math.max(0f, Math.min(c.mapRoi.left, c.kwRoi.left) - pad);
+        float t = Math.max(0f, Math.min(c.mapRoi.top, c.kwRoi.top) - pad);
+        float r = Math.min(1f, Math.max(c.mapRoi.right, c.kwRoi.right) + pad);
+        float b = Math.min(1f, Math.max(c.mapRoi.bottom, c.kwRoi.bottom) + pad);
+        if ((r - l) * (b - t) > 0.85f) return null;
+        Rect rc = new Rect(Math.round(l * w), Math.round(t * h), Math.round(r * w), Math.round(b * h));
+        if (rc.width() < 32 || rc.height() < 32) return null;
+        return rc;
+    }
+
+    private void handleText(long now, Bitmap frame, Rect crop, Text text, float[] sig, AppConfig c,
+                            boolean isOneShot, boolean isAutoLocate) {
         final int w = frame.getWidth(), h = frame.getHeight();
+        final int ox = crop == null ? 0 : crop.left, oy = crop == null ? 0 : crop.top;
         final List<OcrLine> lines = new ArrayList<>();
         final List<NormRect> boxes = new ArrayList<>();
         for (Text.TextBlock b : text.getTextBlocks()) {
             for (Text.Line l : b.getLines()) {
                 Rect r = l.getBoundingBox();
                 if (r == null) continue;
-                OcrLine ol = new OcrLine(l.getText(), r.left / (float) w, r.top / (float) h,
-                        r.right / (float) w, r.bottom / (float) h);
+                OcrLine ol = new OcrLine(l.getText(), (r.left + ox) / (float) w, (r.top + oy) / (float) h,
+                        (r.right + ox) / (float) w, (r.bottom + oy) / (float) h);
                 lines.add(ol);
                 boxes.add(new NormRect(ol.left, ol.top, ol.right, ol.bottom));
             }
+        }
+
+        if (isAutoLocate) {
+            final NormRect found = ScreenParser.autoLocateMap(lines, w / (float) h);
+            main.post(() -> {
+                if (found == null) {
+                    log("❌ 自動定位失敗：畫面中找不到「XX据点所属」。請確認地圖在畫面內、字夠清楚（可拉近變焦或點畫面對焦），或手動「調整框位」");
+                } else {
+                    AppConfig.saveRoi(this, AppConfig.KEY_MAP_ROI, cfg.isPortrait(), found);
+                    reloadConfig();
+                    log("✅ 已自動定位地圖區：" + found + "，位置識別為：" + ScreenParser.extractLocation(lines, found));
+                }
+                overlay.setOcrBoxes(boxes);
+            });
+            buildDebugBitmap(frame, lines, c, monitor.inspect(lines, sig));
+            return;
         }
 
         final ShipMonitor.FrameResult res = monitoring ? monitor.onFrame(now, lines, sig) : monitor.inspect(lines, sig);

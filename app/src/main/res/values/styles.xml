@@ -12,10 +12,27 @@
     </style>
 
     <style name="PanelButton" parent="Widget.AppCompat.Button">
-        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_weight">1</item>
         <item name="android:layout_height">wrap_content</item>
         <item name="android:minHeight">36dp</item>
+        <item name="android:minWidth">0dp</item>
+        <item name="android:paddingLeft">2dp</item>
+        <item name="android:paddingRight">2dp</item>
         <item name="android:textSize">12sp</item>
-        <item name="android:layout_marginTop">2dp</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="android:maxLines">1</item>
+        <item name="android:ellipsize">end</item>
+    </style>
+
+    <style name="PanelButton.Wide">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_weight">0</item>
+    </style>
+
+    <style name="BtnRow">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:orientation">horizontal</item>
     </style>
 </resources>

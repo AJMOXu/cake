@@ -59,6 +59,19 @@ public class ShipMonitorTest {
     }
 
     @Test
+    public void autoLocate() {
+        NormRect r = ScreenParser.autoLocateMap(sampleScreen(false), 1583f / 1143f);
+        System.out.println("autoLocate px = " + r.left * 1583 + "," + r.top * 1143 + " - " + r.right * 1583 + "," + r.bottom * 1143);
+        assertTrue(r != null);
+        // 地名、据点所属在框內；時鐘、「2D」、任務欄不在框內
+        assertEquals("罗兹班岛", ScreenParser.extractLocation(sampleScreen(false), r));
+        assertTrue(!r.contains(1500 / 1583f, 27 / 1143f));   // 時鐘
+        assertTrue(!r.contains(1425 / 1583f, 514 / 1143f));  // 任務欄
+        // 框完全不對時，仍能從全畫面備援拿到位置
+        assertEquals("罗兹班岛", ScreenParser.extractLocation(sampleScreen(false), new NormRect(0.3f, 0.05f, 0.5f, 0.2f)));
+    }
+
+    @Test
     public void rules() {
         List<KeywordRule> r = KeywordRule.parseAll("# x\n停泊|停治 => 到了{loc}\n\n卡莫斯");
         assertEquals(2, r.size());

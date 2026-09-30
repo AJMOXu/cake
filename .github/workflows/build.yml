@@ -17,7 +17,7 @@ jobs:
         with:
           gradle-version: '8.4'
       - name: Build debug APK
-        run: gradle assembleDebug --no-daemon
+        run: gradle testDebugUnitTest assembleDebug --no-daemon
       - uses: actions/upload-artifact@v4
         with:
           name: ShipAlert-apk

@@ -77,7 +77,56 @@ public final class ScreenParser {
             }
             return bestText;
         }
-        return fromStronghold;
+        if (fromStronghold != null) return fromStronghold;
+        // 地圖區內找不到 → 在全畫面找「XXX据点所属」作為備援（框歪了也能拿到位置）
+        for (OcrLine l : lines) {
+            Matcher m = STRONGHOLD.matcher(clean(l.text));
+            if (m.find()) return m.group(1);
+        }
+        return null;
+    }
+
+    private static boolean isStrongholdLine(OcrLine l) {
+        return STRONGHOLD.matcher(clean(l.text)).find();
+    }
+
+    /**
+     * 自動定位右上角地圖區：以「XXX据点所属」行（地圖底部）和上方的地圖標題（地圖頂部）推算地圖框。
+     * @param aspect 影像寬/高
+     * @return 找不到回傳 null
+     */
+    public static NormRect autoLocateMap(List<OcrLine> lines, float aspect) {
+        OcrLine s = null;
+        for (OcrLine l : lines) {
+            if (isStrongholdLine(l) && (s == null || l.cx() > s.cx())) s = l;   // 多個時取最靠右
+        }
+        if (s == null) return null;
+        // 轉成「以影像高度為單位」的座標，避免寬高比失真
+        float sl = s.left * aspect, sr = s.right * aspect, sh = s.height();
+        OcrLine title = null;
+        for (OcrLine l : lines) {
+            if (l == s || l.bottom > s.top || s.top - l.bottom > sh * 16) continue;
+            String t = clean(l.text);
+            if (cjkCount(t) < 2 || SKIP.matcher(l.text).find()) continue;
+            float lcx = l.cx() * aspect;
+            if (lcx < sl - sh * 10 || lcx > sr + sh * 4) continue;           // 要在地圖水平範圍內
+            if (title == null || l.height() > title.height() * 1.05f) title = l;
+        }
+        float top, H;
+        float right = sr;
+        if (title != null) {
+            H = s.bottom - title.top;
+            right = Math.max(right, title.right * aspect);
+        } else {
+            H = sh * 13f;
+        }
+        top = s.bottom - H * 1.05f;
+        float bottom = s.bottom + sh * 0.4f;
+        right = right + H * 0.06f;
+        float left = right - H * 1.3f;
+        NormRect r = new NormRect(left / aspect, top, right / aspect, bottom);
+        if (r.width() < 0.03f || r.height() < 0.05f) return null;
+        return r;
     }
 
     /** 回傳 規則 -> 命中字。 */
